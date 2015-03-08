@@ -79,6 +79,13 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
 
     //todo O(n^4)
 
+
+    for (int i = 0; i < size; ++i) {
+        delete [] cache[i];
+    }
+
+    delete [] cache;
+
     return false;
 }
 
@@ -99,6 +106,12 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
     TRect result;
 
     // todo O(n^3)
+
+    for (int i = 0; i < size; ++i) {
+        delete [] cache[i];
+    }
+
+    delete [] cache;
 
     return false;
 }
