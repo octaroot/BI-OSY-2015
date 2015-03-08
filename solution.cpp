@@ -75,21 +75,32 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
         }
     }
 
+    //debug
+/*
+    for (int i = 0; i < actualSize; ++i) {
+        for (int j = 0; j < actualSize; ++j) {
+            printf ("%5d ", cache[i][j]);
+        }
+        puts("");
+    }
+*/
+
     int maxSuitableArea = 0, totalCost, area;
 
     //O(n^4) search
-    for (int x = 1; x < actualSize; ++x) {
-        for (int y = 1; y < actualSize; ++y) {
-            for (int h = 1; h < x; ++h) {
-                for (int w = 1; w < y; ++w) {
+    for (int row = 1; row < actualSize; ++row) {
+        for (int col = 1; col < actualSize; ++col) {
+            for (int h = 0; h < row; ++h) {
+                for (int w = 0; w < col; ++w) {
 
-                    totalCost = values[x][y] - values[h - 1][w] - values[h][w - 1] + values[h - 1][w - 1];
+                    totalCost = cache[row][col] - cache[row][w] - cache[h][col] + cache[h][w];
 
-                    if (totalCost < maxCost && (area = (y - h) * (x - w)) > maxSuitableArea) {
-                        res->m_H = y - h;
-                        res->m_W = x - w;
-                        res->m_X = x - 1;
-                        res->m_Y = y - 1;
+                    if (totalCost <= maxCost && (area = (row - h) * (col - w)) > maxSuitableArea) {
+
+                        res->m_H = row - h;
+                        res->m_W = col - w;
+                        res->m_X = h;
+                        res->m_Y = w;
 
                         maxSuitableArea = area;
                     }
