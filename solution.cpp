@@ -13,7 +13,6 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/time.h>
-#include <cudaGL.h>
 
 using namespace std;
 
@@ -49,7 +48,37 @@ void MapAnalyzer(int threads, const TCostProblem *(*costFunc)(void), const TCrim
 }
 
 bool FindByCost(int **values, int size, int maxCost, TRect *res) {
-    // todo
+
+    //cache int table (SAT table)
+    int **cache = new int *[size];
+
+    //building the cache
+    //we fill the 0,y and x,0 with initial values to make the main O(n^2) do less conditionals
+
+    //the [0,0]
+    cache[0] = new int[size];
+    cache[0][0] = values[0][0];
+
+    //the [x,0] and [0,y]
+    for (int i = 1; i < size; ++i) {
+        cache[i] = new int[size];
+
+        cache[0][i] = values[0][i] + values[0][i - 1];
+        cache[i][0] = values[i][0] + values[i - 1][0];
+    }
+
+    //the rest. no conditionals, yay!
+    for (int i = 1; i < size; ++i) {
+        for (int j = 1; j < size; ++j) {
+            cache[i][j] = values[i][j] + values[i - 1][j] + values[i][j - 1] - values[i - 1][j - 1];
+        }
+    }
+
+    int maxSuitableArea = 0;
+    TRect result;
+
+    //todo O(n^4)
+
     return false;
 }
 
