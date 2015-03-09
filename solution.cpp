@@ -132,7 +132,7 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
     for (int i = 1; i <= size; ++i) {
         cache[i] = new int[size];
         for (int j = 0; j < size; ++j) {
-            if (maxCrime > values[i - 1][j]) {
+            if (maxCrime >= values[i - 1][j]) {
                 cache[i][j] = 1 + cache[i - 1][j];
             }
             else {
@@ -157,8 +157,42 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 */
 
     //O(n^2) search
-    for (int i = 1; i <= size; ++i) {
 
+    int maxAreas[size], tmpArea;
+    stack<int> stack1;
+
+    //http://tech-queries.blogspot.cz/2011/03/maximum-area-rectangle-in-histogram.html
+    for (int i = 1; i <= size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()])
+            {
+                stack1.pop();
+            }
+            maxAreas[j] = j - 1 - (stack1.empty() ? -1 : stack1.top());
+            stack1.push(j);
+        }
+
+        stack1 = stack<int>();
+
+        for (int j = size - 1; j >= 0; --j) {
+            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()])
+            {
+                stack1.pop();
+            }
+            maxAreas[j] += (stack1.empty() ? size : stack1.top()) - j - 1;
+            stack1.push(j);
+        }
+
+        for (int j = 0; j < size; ++j) {
+            if ((tmpArea = cache[i][j] * (maxAreas[j] + 1)) > maxSuitableArea)
+            {
+                maxSuitableArea = tmpArea;
+                res->m_X = j;
+                res->m_Y = i;
+                res->m_W = maxAreas[j] + 1;
+                res->m_H = cache[i][j];
+            }
+        }
     }
 
     //freeing of cache allocated resources
