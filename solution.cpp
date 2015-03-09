@@ -41,8 +41,6 @@ struct TCrimeProblem {
 
 #endif /* __PROGTEST__ */
 
-#define EPSILON 10e-5
-
 void MapAnalyzer(int threads, const TCostProblem *(*costFunc)(void), const TCrimeProblem *(*crimeFunc)(void)) {
     // todo
 }
@@ -68,7 +66,7 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
         cache[0][i] = 0;
     }
 
-    //the rest. no conditionals, yay!
+    //the rest. no conditionals, yay! O(n^2)
     for (int i = 1; i < actualSize; ++i) {
         for (int j = 1; j < actualSize; ++j) {
             cache[i][j] = values[i - 1][j - 1] + cache[i - 1][j] + cache[i][j - 1] - cache[i - 1][j - 1];
@@ -121,21 +119,47 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
 
 bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 
-    //cache bool table
-    bool **cache = new bool *[size];
+    //cache histogram table
+    int **cache = new int *[size + 1];
 
-    //building the cache
+    //optimization trick - less conditionals :)
+    cache[0] = new int[size];
     for (int i = 0; i < size; ++i) {
-        cache[i] = new bool[size];
+        cache[0][i] = 0;
+    }
+
+    //building the cache O(n^2)
+    for (int i = 1; i <= size; ++i) {
+        cache[i] = new int[size];
         for (int j = 0; j < size; ++j) {
-            cache[i][j] = maxCrime - values[i][j] > EPSILON;
+            if (maxCrime > values[i - 1][j]) {
+                cache[i][j] = 1 + cache[i - 1][j];
+            }
+            else {
+                cache[i][j] = 0;
+            }
         }
     }
 
-    /*int maxSuitableArea = 0;
-    TRect result;*/
+    int maxSuitableArea = 0;
 
-    //TODO O(n^3)
+    //debug
+/*
+    for (int i = 0; i <= size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            if (cache[i][j] == 0)
+                printf("      ");
+            else
+                printf("%5d ", cache[i][j]);
+        }
+        puts("");
+    }
+*/
+
+    //O(n^2) search
+    for (int i = 1; i <= size; ++i) {
+
+    }
 
     //freeing of cache allocated resources
     for (int i = 0; i < size; ++i) {
@@ -144,5 +168,5 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 
     delete[] cache;
 
-    return false;
+    return maxSuitableArea != 0;
 }
