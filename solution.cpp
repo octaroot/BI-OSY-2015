@@ -144,21 +144,31 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
     int maxSuitableArea = 0;
 
     //debug
-/*
-    for (int i = 0; i <= size; ++i) {
+
+    printf(" ");
+
+    for (int i = 0; i < size; ++i) {
+        printf("%4d", i);
+    }
+
+    puts("");
+
+    for (int i = 1; i <= size; ++i) {
+        printf("%d:", i - 1);
         for (int j = 0; j < size; ++j) {
             if (cache[i][j] == 0)
-                printf("      ");
+                printf("    ");
             else
-                printf("%5d ", cache[i][j]);
+                printf("%3d ", cache[i][j]);
         }
         puts("");
     }
-*/
+
 
     //O(n^2) search
 
-    int maxAreas[size], tmpArea;
+    int * maxAreas = new int [size];
+    int tmpArea;
     stack<int> stack1;
 
     //http://tech-queries.blogspot.cz/2011/03/maximum-area-rectangle-in-histogram.html
@@ -188,12 +198,28 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
             {
                 maxSuitableArea = tmpArea;
                 res->m_X = j;
-                res->m_Y = i;
+                res->m_Y = size - i;
                 res->m_W = maxAreas[j] + 1;
                 res->m_H = cache[i][j];
+
+                /* 12%
+                x=i
+                y=j
+                w=c
+                h=ma+1
+                 */
+
+                /* 12%
+                x=j
+                y=i
+                w=ma+1
+                h=c
+                 */
             }
         }
     }
+
+    delete [] maxAreas;
 
     //freeing of cache allocated resources
     for (int i = 0; i < size; ++i) {
