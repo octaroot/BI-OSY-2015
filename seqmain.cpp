@@ -117,7 +117,7 @@ void               crimeTest                               ( void )
           if ( g_CrimeRes[i] . m_Area != r . m_W * r . m_H )
               printf ( "Bad (%lf). Expected %d, got %d (%d x %d) @ (%d, %d)\n", g_CrimeRes[i].m_CrimeMax , g_CrimeRes[i] . m_Area, r . m_W * r . m_H, r . m_W, r . m_H, r.m_X, r.m_Y);
           else
-              printf("Good (%lf = %dm^2)\n", g_CrimeRes[i].m_CrimeMax, g_CrimeRes[i].m_Area);
+              printf("Good (%lf = %dm^2, got %d (%d x %d) @ (%d, %d)\n", g_CrimeRes[i].m_CrimeMax, g_CrimeRes[i].m_Area, r . m_W * r . m_H, r . m_W, r . m_H, r.m_X, r.m_Y);
       }
       else
       {
@@ -131,7 +131,7 @@ void               crimeTest                               ( void )
 //-------------------------------------------------------------------------------------------------
 int                main                                    ( void )
  {
-   costTest ();
+   //costTest ();
    crimeTest ();
 
    return 0;
