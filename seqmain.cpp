@@ -19,7 +19,7 @@ struct TCrimeRes
    int m_Area;
  };
 
-static int g_CostMat[COST_SIZE * COST_SIZE] = 
+static int g_CostMat[COST_SIZE * COST_SIZE] =
  {
    824,  757,  896,  255,  189,  404,  277,  914,  564,   18,
    -85,   41,   61,   30,  981,  436,  548,  569,  398,  176,
@@ -33,7 +33,7 @@ static int g_CostMat[COST_SIZE * COST_SIZE] =
    259,  498,  621,  429,  170,  468,  659, -132,  734,  777
  };
 
-static double g_CrimeMat[CRIME_SIZE * CRIME_SIZE] = 
+static double g_CrimeMat[CRIME_SIZE * CRIME_SIZE] =
  {
   244.75, 186.50, 226.00, 245.75, 167.50, 125.50,  43.00, 207.75, 222.50,  21.50,
   163.25,  63.75, 158.25,  59.00, 175.75,  80.75,  83.75,  59.75,  20.75, 159.00,
@@ -46,7 +46,7 @@ static double g_CrimeMat[CRIME_SIZE * CRIME_SIZE] =
   246.00,   3.25, 207.25,  84.50,  49.00, 110.50, 239.75, 229.75, 191.75, 175.50,
    32.25, 172.00,  97.25, 194.00, 235.75, 229.25, 215.75,  52.75, 198.75, 138.00
  };
- 
+
 static TCostRes g_CostRes [] =
  {
    { -234, 0 }, { -214, 0 }, { -156, 2 }, { -59, 3 }, { 76, 4 },
@@ -78,22 +78,26 @@ static TCrimeRes g_CrimeRes [] =
 void               costTest                                ( void )
  {
    int * mat[COST_SIZE];
-   
+
    for ( int i = 0; i < COST_SIZE; i ++ )
     mat[i] = g_CostMat + i * COST_SIZE;
-    
+
    for ( int i = 0; i < RES_SIZE; i ++ )
     {
       TRect r;
       if ( FindByCost ( mat, COST_SIZE, g_CostRes [i] . m_CostMax, &r ) )
        {
          if ( g_CostRes[i] . m_Area != r . m_W * r . m_H )
-          printf ( "Cost: mismatch\n" );
+          printf ( "Bad (%d). Expected %d, got %d (%d x %d) @ (%d, %d)\n", g_CostRes[i].m_CostMax , g_CostRes[i] . m_Area, r . m_W * r . m_H, r . m_W, r . m_H, r.m_X, r.m_Y);
+         else
+             printf("Good (%d = %dm^2)\n", g_CostRes[i].m_CostMax, g_CostRes[i].m_Area);
        }
       else
        {
          if ( g_CostRes[i] . m_Area != 0 )
-          printf ( "Cost: mismatch\n" );
+             printf ( "Bad (%d). Expected %d, got false\n", g_CostRes[i].m_CostMax , g_CostRes[i] . m_Area);
+           else
+             printf("Good (%d = %dm^2)\n", g_CostRes[i].m_CostMax, g_CostRes[i].m_Area);
        }
     }
  }
@@ -101,30 +105,34 @@ void               costTest                                ( void )
 void               crimeTest                               ( void )
  {
    double * mat[CRIME_SIZE];
-   
+
    for ( int i = 0; i < CRIME_SIZE; i ++ )
     mat[i] = g_CrimeMat + i * CRIME_SIZE;
-    
+
    for ( int i = 0; i < RES_SIZE; i ++ )
     {
       TRect r;
       if ( FindByCrime ( mat, CRIME_SIZE, g_CrimeRes [i] . m_CrimeMax, &r ) )
-       {
-         if ( g_CrimeRes[i] . m_Area != r . m_W * r . m_H )
-          printf ( "Crime: mismatch\n" );
-       }
+      {
+          if ( g_CrimeRes[i] . m_Area != r . m_W * r . m_H )
+              printf ( "Bad (%lf). Expected %d, got %d (%d x %d) @ (%d, %d)\n", g_CrimeRes[i].m_CrimeMax , g_CrimeRes[i] . m_Area, r . m_W * r . m_H, r . m_W, r . m_H, r.m_X, r.m_Y);
+          else
+              printf("Good (%lf = %dm^2)\n", g_CrimeRes[i].m_CrimeMax, g_CrimeRes[i].m_Area);
+      }
       else
-       {
-         if ( g_CrimeRes[i] . m_Area != 0 )
-          printf ( "Crime: mismatch\n" );
-       }
+      {
+          if ( g_CrimeRes[i] . m_Area != 0 )
+              printf ( "Bad (%lf). Expected %d, got false\n", g_CrimeRes[i].m_CrimeMax , g_CrimeRes[i] . m_Area);
+          else
+              printf("Good (%lf = %dm^2)\n", g_CrimeRes[i].m_CrimeMax, g_CrimeRes[i].m_Area);
+      }
     }
  }
 //-------------------------------------------------------------------------------------------------
 int                main                                    ( void )
  {
-   costTest ();
+   //costTest ();
    crimeTest ();
 
    return 0;
- } 
+ }
