@@ -207,9 +207,8 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
                 y=j
                 w=c
                 h=ma+1
-                 */
 
-                /* 12%
+                12%
                 x=j
                 y=i
                 w=ma+1
