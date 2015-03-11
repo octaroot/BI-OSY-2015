@@ -8,8 +8,12 @@
 #include <queue>
 #include <stack>
 #include <deque>
+
+#ifdef linux
 #include <pthread.h>
 #include <semaphore.h>
+#endif
+
 #include <stdint.h>
 #include <time.h>
 #include <sys/time.h>
@@ -119,32 +123,26 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
 
 bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 
-    //cache histogram table
-    int **cache = new int *[size + 1];
+    //cache bool table
+    bool **cache = new bool *[size];
 
-    //optimization trick - less conditionals :)
-    cache[0] = new int[size];
-    for (int i = 0; i < size; ++i) {
-        cache[0][i] = 0;
-    }
+    //algo caches
+    int ** dN = new int*[size], ** dS = new int*[size];
 
     //building the cache O(n^2)
-    for (int i = 1; i <= size; ++i) {
-        cache[i] = new int[size];
+    for (int i = 0; i < size; ++i) {
+        cache[i] = new bool[size];
+        dN[i] = new int[size];
+        dS[i] = new int[size];
         for (int j = 0; j < size; ++j) {
-            if (maxCrime >= values[i - 1][j]) {
-                cache[i][j] = 1 + cache[i - 1][j];
-            }
-            else {
-                cache[i][j] = 0;
-            }
+            cache[i][j] = maxCrime >= values[i - 1][j];
         }
     }
 
     int maxSuitableArea = 0;
 
     //debug
-
+/*
     printf(" ");
 
     for (int i = 0; i < size; ++i) {
@@ -163,64 +161,79 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
         }
         puts("");
     }
-
+*/
 
     //O(n^2) search
+    for (int i = 0; i < size; ++i) {
+        dN[0][i] = cache[0][i] ? 0 : -1;
+    }
 
-    int * maxAreas = new int [size];
-    int tmpArea;
-    stack<int> stack1;
-
-    //http://tech-queries.blogspot.cz/2011/03/maximum-area-rectangle-in-histogram.html
-    for (int i = 1; i <= size; ++i) {
+    for (int i = 1; i < size; ++i) {
         for (int j = 0; j < size; ++j) {
-            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()])
-            {
-                stack1.pop();
-            }
-            maxAreas[j] = j - 1 - (stack1.empty() ? -1 : stack1.top());
-            stack1.push(j);
+            if (cache[i][j])
+                dN[i][j] = dN[i - 1][j] + 1;
+            else
+                dN[i][j] = -1;
         }
+    }
 
-        stack1 = stack<int>();
+    for (int i = 0; i < size; ++i) {
+        dS[size - 1][i] = cache[size - 1][i] ? 0 : -1;
+    }
 
+    for (int i = size - 2; i >= 0; --i) {
+        for (int j = 0; j < size; ++j) {
+            if (cache[i][j])
+                dS[i][j] = dN[i + 1][j] + 1;
+            else
+                dS[i][j] = -1;
+        }
+    }
+
+    TRect result;
+
+    for (int i = size - 1; i >= 0; --i) {
+        int maxS = size;
         for (int j = size - 1; j >= 0; --j) {
-            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()])
+            ++maxS;
+            if (cache[i][j] && (j == 0 || !cache[i][j - 1]))
             {
-                stack1.pop();
-            }
-            maxAreas[j] += (stack1.empty() ? size : stack1.top()) - j - 1;
-            stack1.push(j);
-        }
-
-        for (int j = 0; j < size; ++j) {
-            if ((tmpArea = cache[i][j] * (maxAreas[j] + 1)) > maxSuitableArea)
-            {
-                maxSuitableArea = tmpArea;
-                res->m_X = j;
-                res->m_Y = size - i;
-                res->m_W = maxAreas[j] + 1;
-                res->m_H = cache[i][j];
-
-                /* 12%
-                x=i
-                y=j
-                w=c
-                h=ma+1
-                */
-
-                /*
-                12%
-                x=j
-                y=i
-                w=ma+1
-                h=c
-                 */
+                int N = dN[i][j];
+                int S = dS[i][j];
+                int width = 1;
+                while (j + width < size && cache[i][j + width])
+                {
+                    int nextN = dN[i][j + width], nextS = dS[i][j + width];
+                    if (nextN < N || nextS < S)
+                    {
+                        if (S < maxS)
+                        {
+                            result.m_X = i - N;
+                            result.m_Y = j;
+                            result.m_W = width;
+                            result.m_H = N + S + 1;
+                            maxSuitableArea = result.m_W * result.m_H;
+                        }
+                        if (nextN < N) N = nextN;
+                        if (nextS < S) S = nextS;
+                    }
+                    ++width;
+                }
+                if (S < maxS)
+                {
+                    result.m_X = i - N;
+                    result.m_Y = j;
+                    result.m_W = width;
+                    result.m_H = N + S + 1;
+                    maxSuitableArea = result.m_W * result.m_H;
+                }
+                maxS = 0;
             }
         }
     }
 
-    delete [] maxAreas;
+    //res = result;
+
 
     //freeing of cache allocated resources
     for (int i = 0; i < size; ++i) {
