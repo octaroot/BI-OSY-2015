@@ -86,19 +86,19 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
     int maxSuitableArea = 0, totalCost, area;
 
     //O(n^4) search
-    for (int row = 1; row < actualSize; ++row) {
-        for (int col = 1; col < actualSize; ++col) {
-            for (int h = 0; h < row; ++h) {
-                for (int w = 0; w < col; ++w) {
+    for (int tl_row = 0; tl_row < actualSize; ++tl_row) {
+        for (int tl_col = 0; tl_col < actualSize; ++tl_col) {
+            for (int br_row = tl_row; br_row < actualSize; ++br_row) {
+                for (int br_col = tl_col; br_col < actualSize; ++br_col) {
 
-                    totalCost = cache[row][col] - cache[row][w] - cache[h][col] + cache[h][w];
+                    totalCost = cache[br_row][br_col] - cache[tl_row][br_col] - cache[br_row][tl_col] + cache[tl_row][tl_col];
 
-                    if (totalCost <= maxCost && (area = (row - h) * (col - w)) > maxSuitableArea) {
+                    if (totalCost <= maxCost && (area = (br_row - tl_row) * (br_col - tl_col)) > maxSuitableArea) {
 
-                        res->m_H = row - h;
-                        res->m_W = col - w;
-                        res->m_X = h;
-                        res->m_Y = w;
+                        res->m_H = br_row - tl_row;
+                        res->m_W = br_col - tl_col;
+                        res->m_X = tl_col;
+                        res->m_Y = tl_row;
 
                         maxSuitableArea = area;
                     }
@@ -167,7 +167,9 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 
     //O(n^2) search
 
-    int maxAreas[size], tmpArea, left[size];
+    int * maxAreas = new int [size];
+    int tmpArea;
+    int * left = new int [size];
     stack<int> stack1;
 
     /*
@@ -202,8 +204,8 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
             if ((tmpArea = cache[i][j] * (maxAreas[j] + 1)) > maxSuitableArea)
             {
                 maxSuitableArea = tmpArea;
-                res->m_X = i - cache[i][j];
-                res->m_Y = j - left[j];
+                res->m_X = j - left[j];
+                res->m_Y = i - cache[i][j];
                 res->m_W = maxAreas[j] + 1;
                 res->m_H = cache[i][j];
             }
