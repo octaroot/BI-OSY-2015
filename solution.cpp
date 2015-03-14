@@ -41,9 +41,18 @@ struct TCrimeProblem {
 
 #endif /* __PROGTEST__ */
 
-void MapAnalyzer(int threads, const TCostProblem *(*costFunc)(void), const TCrimeProblem *(*crimeFunc)(void)) {
-    // todo
-}
+#define BUFFER_SIZE 50
+
+bool g_ProucersDone = false;
+int g_Pos = 0;
+struct {
+    bool isCostProblem;
+    const void *problem;
+} g_Buffer[BUFFER_SIZE + 1];
+
+pthread_mutex_t g_MtxBuffer;
+sem_t g_Full, g_Free;
+
 
 bool FindByCost(int **values, int size, int maxCost, TRect *res) {
 
@@ -167,9 +176,9 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 
     //O(n^2) search
 
-    int * maxAreas = new int [size];
+    int *maxAreas = new int[size];
     int tmpArea;
-    int * left = new int [size];
+    int *left = new int[size];
     stack<int> stack1;
 
     /*
@@ -181,8 +190,7 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
      */
     for (int i = 1; i <= size; ++i) {
         for (int j = 0; j < size; ++j) {
-            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()])
-            {
+            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()]) {
                 stack1.pop();
             }
             left[j] = maxAreas[j] = j - 1 - (stack1.empty() ? -1 : stack1.top());
@@ -192,8 +200,7 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
         stack1 = stack<int>();
 
         for (int j = size - 1; j >= 0; --j) {
-            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()])
-            {
+            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()]) {
                 stack1.pop();
             }
             maxAreas[j] += (stack1.empty() ? size : stack1.top()) - j - 1;
@@ -201,8 +208,7 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
         }
 
         for (int j = 0; j < size; ++j) {
-            if ((tmpArea = cache[i][j] * (maxAreas[j] + 1)) > maxSuitableArea)
-            {
+            if ((tmpArea = cache[i][j] * (maxAreas[j] + 1)) > maxSuitableArea) {
                 maxSuitableArea = tmpArea;
                 res->m_X = j - left[j];
                 res->m_Y = i - cache[i][j];
@@ -213,11 +219,172 @@ bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
     }
 
     //freeing of cache allocated resources
-    for (int i = 0; i < size; ++i) {
+    for (int i = 0; i <= size; ++i) {
         delete[] cache[i];
     }
 
     delete[] cache;
+    delete[] maxAreas;
+    delete[] left;
 
     return maxSuitableArea != 0;
+}
+
+void solveProblems() {
+    while (1) {
+
+        sem_wait(&g_Full);
+
+        pthread_mutex_lock(&g_MtxBuffer);
+
+        bool isCostProblem = g_Buffer[g_Pos].isCostProblem;
+        const void *problem = g_Buffer[g_Pos--].problem;
+
+        if (problem == NULL)
+        {
+            ++g_Pos;
+            pthread_mutex_unlock(&g_MtxBuffer);
+            sem_post(&g_Full);
+            //puts ("zabijim vlakno po zarazce");
+            return;
+        }
+
+        //printf("queue--%d\n", g_Pos);
+
+        pthread_mutex_unlock(&g_MtxBuffer);
+
+
+        if (isCostProblem) {
+            const TCostProblem *costProblem = (const TCostProblem *) problem;
+            TRect solution;
+
+            if (FindByCost(costProblem->m_Values, costProblem->m_Size, costProblem->m_MaxCost, &solution)) {
+                costProblem->m_Done((const TCostProblem *) problem, &solution);
+            }
+            else {
+                costProblem->m_Done((const TCostProblem *) problem, NULL);
+            }
+
+        }
+        else {
+            const TCrimeProblem *CrimeProblem = (const TCrimeProblem *) problem;
+            TRect solution;
+
+            if (FindByCrime(CrimeProblem->m_Values, CrimeProblem->m_Size, CrimeProblem->m_MaxCrime, &solution)) {
+                CrimeProblem->m_Done((const TCrimeProblem *) problem, &solution);
+            }
+            else {
+                CrimeProblem->m_Done((const TCrimeProblem *) problem, NULL);
+            }
+        }
+
+        sem_post(&g_Free);
+    }
+}
+
+void generateCostProblems(const void *(*costFunc)(void)) {
+    void const *problem;
+
+    while ((problem = costFunc()) != NULL) {
+        sem_wait(&g_Free);
+        pthread_mutex_lock(&g_MtxBuffer);
+
+        g_Buffer[++g_Pos].isCostProblem = true;
+        g_Buffer[g_Pos].problem = problem;
+
+        //printf("queue o ++%d\n", g_Pos);
+
+        pthread_mutex_unlock(&g_MtxBuffer);
+        sem_post(&g_Full);
+        //printf("Produced cost problem\n");
+    }
+
+    //puts("\t[GO all done, exiting]");
+
+    return;
+}
+
+void generateCrimeProblems(const void *(*crimeFunc)(void)) {
+    void const *problem;
+
+    while ((problem = crimeFunc()) != NULL) {
+        sem_wait(&g_Free);
+        pthread_mutex_lock(&g_MtxBuffer);
+        g_Buffer[++g_Pos].isCostProblem = false;
+        g_Buffer[g_Pos].problem = problem;
+
+        //printf("queue i ++%d\n", g_Pos);
+
+        pthread_mutex_unlock(&g_MtxBuffer);
+        sem_post(&g_Full);
+
+        //printf("Produced Crime problem\n");
+    }
+
+    //puts("\t[GI all done, exiting]");
+
+    return;
+}
+
+void MapAnalyzer(int threads, const TCostProblem *(*costFunc)(void), const TCrimeProblem *(*crimeFunc)(void)) {
+
+    pthread_t *thrID = new pthread_t[2 + threads];
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    pthread_mutex_init(&g_MtxBuffer, NULL);
+    sem_init(&g_Free, 0, BUFFER_SIZE);
+    sem_init(&g_Full, 0, 0);
+
+    for (int i = 0; i < threads; i++)
+        if (pthread_create(&thrID[i], &attr, (void *(*)(void *)) solveProblems, NULL)) {
+            perror("pthread_create solver");
+            return;
+        }
+
+    if (pthread_create(&thrID[threads], &attr, (void *(*)(void *)) generateCostProblems, (void*)costFunc)) {
+        perror("pthread_create generator cost");
+        return;
+    }
+
+    if (pthread_create(&thrID[threads + 1], &attr, (void *(*)(void *)) generateCrimeProblems, (void*)crimeFunc)) {
+        perror("pthread_create generator crime");
+        return;
+    }
+
+    pthread_attr_destroy(&attr);
+
+    pthread_join(thrID[threads], NULL);
+    pthread_join(thrID[threads + 1], NULL);
+
+    pthread_mutex_lock(&g_MtxBuffer);
+    g_ProucersDone = true;
+    pthread_mutex_unlock(&g_MtxBuffer);
+
+    //puts("cekam na volne misto pro vlozeni zarazky");
+
+    sem_wait(&g_Free);
+    pthread_mutex_lock(&g_MtxBuffer);
+
+    g_Buffer[++g_Pos] = g_Buffer[0];
+    g_Buffer[0].problem = NULL;
+
+    //puts ("zarazka vlozena");
+
+    pthread_mutex_unlock(&g_MtxBuffer);
+    sem_post(&g_Full);
+
+    //puts ("produceni dojeli");
+
+    for (int i = 0; i < threads; i++)
+        pthread_join(thrID[i], NULL);
+
+    pthread_mutex_destroy(&g_MtxBuffer);
+    sem_destroy(&g_Free);
+    sem_destroy(&g_Full);
+
+    delete [] thrID;
+
+
 }
