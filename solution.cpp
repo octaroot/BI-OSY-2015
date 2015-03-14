@@ -43,12 +43,13 @@ struct TCrimeProblem {
 
 #define BUFFER_SIZE 50
 
-bool g_ProucersDone = false;
 int g_Pos = 0;
-struct {
+struct TMyBuffer {
     bool isCostProblem;
     const void *problem;
-} g_Buffer[BUFFER_SIZE + 1];
+};
+
+TMyBuffer g_Buffer[BUFFER_SIZE + 1];
 
 pthread_mutex_t g_MtxBuffer;
 sem_t g_Full, g_Free;
@@ -337,30 +338,17 @@ void MapAnalyzer(int threads, const TCostProblem *(*costFunc)(void), const TCrim
     sem_init(&g_Free, 0, BUFFER_SIZE);
     sem_init(&g_Full, 0, 0);
 
+    pthread_create(&thrID[threads], &attr, (void *(*)(void *)) generateCostProblems, (void*)costFunc);
+    pthread_create(&thrID[threads + 1], &attr, (void *(*)(void *)) generateCrimeProblems, (void*)crimeFunc);
+
     for (int i = 0; i < threads; i++)
-        if (pthread_create(&thrID[i], &attr, (void *(*)(void *)) solveProblems, NULL)) {
-            perror("pthread_create solver");
-            return;
-        }
+        pthread_create(&thrID[i], &attr, (void *(*)(void *)) solveProblems, NULL);
 
-    if (pthread_create(&thrID[threads], &attr, (void *(*)(void *)) generateCostProblems, (void*)costFunc)) {
-        perror("pthread_create generator cost");
-        return;
-    }
-
-    if (pthread_create(&thrID[threads + 1], &attr, (void *(*)(void *)) generateCrimeProblems, (void*)crimeFunc)) {
-        perror("pthread_create generator crime");
-        return;
-    }
 
     pthread_attr_destroy(&attr);
 
     pthread_join(thrID[threads], NULL);
     pthread_join(thrID[threads + 1], NULL);
-
-    pthread_mutex_lock(&g_MtxBuffer);
-    g_ProucersDone = true;
-    pthread_mutex_unlock(&g_MtxBuffer);
 
     //puts("cekam na volne misto pro vlozeni zarazky");
 
