@@ -97,7 +97,7 @@ int                main                                    ( void )
  {
      //oneTest ( 500, 1, 1 );
 
-   oneTest ( 5, 20, 20 );
+   oneTest ( 500, 2, 2 );
    //oneTest ( 1, 2, 2 );
    return 0;
  } 

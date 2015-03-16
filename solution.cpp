@@ -41,7 +41,7 @@ struct TCrimeProblem {
 
 #endif /* __PROGTEST__ */
 
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 70
 
 struct TMyBuffer {
     const TCrimeProblem *crimeProblem;

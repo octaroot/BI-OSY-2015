@@ -11,4 +11,4 @@ set(SOURCE_FILES
 
 include_directories(.)
 
-add_executable(ProgtestOSY1 seqmain.cpp)
+add_executable(ProgtestOSY1 thrmain.cpp)
