@@ -41,15 +41,23 @@ struct TCrimeProblem {
 
 #endif /* __PROGTEST__ */
 
-#define BUFFER_SIZE 50
+#define BUFFER_SIZE 100
 
-int g_Pos = 0;
 struct TMyBuffer {
-    bool isCostProblem;
-    const void *problem;
+    const TCrimeProblem *crimeProblem;
+    const TCostProblem *costProblem;
+
+    TMyBuffer(TCrimeProblem const *crimeProblem, TCostProblem const *costProblem)
+            : crimeProblem(crimeProblem), costProblem(costProblem) {
+    }
 };
 
-TMyBuffer g_Buffer[BUFFER_SIZE + 1];
+struct TFunctionPointer
+{
+    const void *(*func)(void);
+};
+
+queue<TMyBuffer*> g_Buffer;
 
 pthread_mutex_t g_MtxBuffer;
 sem_t g_Full, g_Free;
@@ -238,44 +246,42 @@ void solveProblems() {
 
         pthread_mutex_lock(&g_MtxBuffer);
 
-        bool isCostProblem = g_Buffer[g_Pos].isCostProblem;
-        const void *problem = g_Buffer[g_Pos--].problem;
+        TMyBuffer * top = g_Buffer.front();
 
-        if (problem == NULL)
-        {
-            ++g_Pos;
+        const TCostProblem *costProblem = top->costProblem;
+        const TCrimeProblem *crimeProblem = top->crimeProblem;
+
+        if (costProblem == NULL && crimeProblem == NULL) {
             pthread_mutex_unlock(&g_MtxBuffer);
             sem_post(&g_Full);
             //puts ("zabijim vlakno po zarazce");
             return;
         }
 
-        //printf("queue--%d\n", g_Pos);
+        g_Buffer.pop();
 
         pthread_mutex_unlock(&g_MtxBuffer);
 
+        delete top;
 
-        if (isCostProblem) {
-            const TCostProblem *costProblem = (const TCostProblem *) problem;
-            TRect solution;
+        TRect solution;
+
+        if (costProblem) {
 
             if (FindByCost(costProblem->m_Values, costProblem->m_Size, costProblem->m_MaxCost, &solution)) {
-                costProblem->m_Done((const TCostProblem *) problem, &solution);
+                costProblem->m_Done(costProblem, &solution);
             }
             else {
-                costProblem->m_Done((const TCostProblem *) problem, NULL);
+                costProblem->m_Done(costProblem, NULL);
             }
 
         }
         else {
-            const TCrimeProblem *CrimeProblem = (const TCrimeProblem *) problem;
-            TRect solution;
-
-            if (FindByCrime(CrimeProblem->m_Values, CrimeProblem->m_Size, CrimeProblem->m_MaxCrime, &solution)) {
-                CrimeProblem->m_Done((const TCrimeProblem *) problem, &solution);
+            if (FindByCrime(crimeProblem->m_Values, crimeProblem->m_Size, crimeProblem->m_MaxCrime, &solution)) {
+                crimeProblem->m_Done(crimeProblem, &solution);
             }
             else {
-                CrimeProblem->m_Done((const TCrimeProblem *) problem, NULL);
+                crimeProblem->m_Done(crimeProblem, NULL);
             }
         }
 
@@ -283,46 +289,39 @@ void solveProblems() {
     }
 }
 
-void generateCostProblems(const void *(*costFunc)(void)) {
-    void const *problem;
+void generateCostProblems(const TFunctionPointer* f) {
 
-    while ((problem = costFunc()) != NULL) {
+    const TCostProblem * problem;
+
+    while ((problem = (const TCostProblem *)f->func()) != NULL) {
         sem_wait(&g_Free);
         pthread_mutex_lock(&g_MtxBuffer);
 
-        g_Buffer[++g_Pos].isCostProblem = true;
-        g_Buffer[g_Pos].problem = problem;
+        TMyBuffer * newProblem = new TMyBuffer(NULL, problem);
 
-        //printf("queue o ++%d\n", g_Pos);
+        g_Buffer.push(newProblem);
 
         pthread_mutex_unlock(&g_MtxBuffer);
         sem_post(&g_Full);
-        //printf("Produced cost problem\n");
     }
-
-    //puts("\t[GO all done, exiting]");
 
     return;
 }
 
-void generateCrimeProblems(const void *(*crimeFunc)(void)) {
-    void const *problem;
+void generateCrimeProblems(const TFunctionPointer* f) {
+    const TCrimeProblem* problem;
 
-    while ((problem = crimeFunc()) != NULL) {
+    while ((problem = (const TCrimeProblem*)f->func()) != NULL) {
         sem_wait(&g_Free);
         pthread_mutex_lock(&g_MtxBuffer);
-        g_Buffer[++g_Pos].isCostProblem = false;
-        g_Buffer[g_Pos].problem = problem;
 
-        //printf("queue i ++%d\n", g_Pos);
+        TMyBuffer * newProblem = new TMyBuffer(problem, NULL);
+
+        g_Buffer.push(newProblem);
 
         pthread_mutex_unlock(&g_MtxBuffer);
         sem_post(&g_Full);
-
-        //printf("Produced Crime problem\n");
     }
-
-    //puts("\t[GI all done, exiting]");
 
     return;
 }
@@ -338,41 +337,42 @@ void MapAnalyzer(int threads, const TCostProblem *(*costFunc)(void), const TCrim
     sem_init(&g_Free, 0, BUFFER_SIZE);
     sem_init(&g_Full, 0, 0);
 
-    pthread_create(&thrID[threads], &attr, (void *(*)(void *)) generateCostProblems, (void*)costFunc);
-    pthread_create(&thrID[threads + 1], &attr, (void *(*)(void *)) generateCrimeProblems, (void*)crimeFunc);
+    TFunctionPointer costFunctionPointer, crimeFunctionPointer;
+
+    costFunctionPointer.func = (void const *(*)()) costFunc;
+    crimeFunctionPointer.func = (void const *(*)()) crimeFunc;
+
+    pthread_create(&thrID[threads], &attr, (void *(*)(void *)) generateCostProblems, &costFunctionPointer);
+    pthread_create(&thrID[threads + 1], &attr, (void *(*)(void *)) generateCrimeProblems, &crimeFunctionPointer);
 
     for (int i = 0; i < threads; i++)
         pthread_create(&thrID[i], &attr, (void *(*)(void *)) solveProblems, NULL);
-
 
     pthread_attr_destroy(&attr);
 
     pthread_join(thrID[threads], NULL);
     pthread_join(thrID[threads + 1], NULL);
 
-    //puts("cekam na volne misto pro vlozeni zarazky");
-
     sem_wait(&g_Free);
     pthread_mutex_lock(&g_MtxBuffer);
 
-    g_Buffer[++g_Pos] = g_Buffer[0];
-    g_Buffer[0].problem = NULL;
+    TMyBuffer *zarazka = new TMyBuffer(NULL, NULL);
 
-    //puts ("zarazka vlozena");
+    g_Buffer.push(zarazka);
 
     pthread_mutex_unlock(&g_MtxBuffer);
     sem_post(&g_Full);
 
-    //puts ("produceni dojeli");
-
     for (int i = 0; i < threads; i++)
         pthread_join(thrID[i], NULL);
+
+    g_Buffer.pop();
+    delete zarazka;
 
     pthread_mutex_destroy(&g_MtxBuffer);
     sem_destroy(&g_Free);
     sem_destroy(&g_Full);
 
-    delete [] thrID;
-
+    delete[] thrID;
 
 }
