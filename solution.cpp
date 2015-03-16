@@ -137,104 +137,83 @@ bool FindByCost(int **values, int size, int maxCost, TRect *res) {
 
 bool FindByCrime(double **values, int size, double maxCrime, TRect *res) {
 
-    //cache histogram table
-    int **cache = new int *[size + 1];
-
-    //optimization trick - less conditionals :)
-    cache[0] = new int[size];
-    for (int i = 0; i < size; ++i) {
-        cache[0][i] = 0;
-    }
+    //cache table
+    bool **cache = new bool *[size];
 
     //building the cache O(n^2)
-    for (int i = 1; i <= size; ++i) {
-        cache[i] = new int[size];
+    for (int i = 0; i < size; ++i) {
+        cache[i] = new bool[size];
         for (int j = 0; j < size; ++j) {
-            if (maxCrime >= values[i - 1][j]) {
-                cache[i][j] = 1 + cache[i - 1][j];
-            }
-            else {
-                cache[i][j] = 0;
-            }
+            cache[i][j] = maxCrime >= values[i][j];
         }
     }
 
     int maxSuitableArea = 0;
 
-    //debug
-/*
-    printf(" ");
-
-    for (int i = 0; i < size; ++i) {
-        printf("%4d", i);
-    }
-
-    puts("");
-
-    for (int i = 1; i <= size; ++i) {
-        printf("%d:", i - 1);
-        for (int j = 0; j < size; ++j) {
-            if (cache[i][j] == 0)
-                printf("    ");
-            else
-                printf("%3d ", cache[i][j]);
-        }
-        puts("");
-    }
-*/
-
-    //O(n^2) search
-
-    int *maxAreas = new int[size];
-    int tmpArea;
-    int *left = new int[size];
-    stack<int> stack1;
+    //O(n^3) search
 
     /*
      * DISCLAIMER
      *
      * Maximum-area continuous rectangle in histogram algorithm used
      *
-     * http://tech-queries.blogspot.cz/2011/03/maximum-area-rectangle-in-histogram.html
+     * http://www.seas.gwu.edu/~simhaweb/cs151/lectures/module6/module6.html
      */
-    for (int i = 1; i <= size; ++i) {
-        for (int j = 0; j < size; ++j) {
-            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()]) {
-                stack1.pop();
-            }
-            left[j] = maxAreas[j] = j - 1 - (stack1.empty() ? -1 : stack1.top());
-            stack1.push(j);
+
+    int * rowCache = new int[size];
+
+    for (int row = 0; row < size; ++row) {
+
+        //rebuild the row cache
+        for (int col = 0; col < size; ++col) {
+            rowCache[col] = 0;
+            for (int rowInsideCol = row; rowInsideCol < size && cache[rowInsideCol][col]; ++rowInsideCol)
+                rowCache[col]++;
+
         }
 
-        stack1 = stack<int>();
+        for (int col = 0; col < size; ++col) {
 
-        for (int j = size - 1; j >= 0; --j) {
-            while (!stack1.empty() && cache[i][j] <= cache[i][stack1.top()]) {
-                stack1.pop();
+            if (!cache[row][col]) continue;
+
+            int currentRow, currentCol = col, rowMax;
+
+            rowMax = size - 1;
+
+            while (currentCol < size && cache[row][currentCol])
+            {
+                currentRow = row + rowCache[currentCol] - 1;
+                if (currentRow < rowMax)
+                    rowMax = currentRow;
+                else
+                    currentRow = rowMax;
+
+                int tempArea;
+                if ((tempArea = (currentCol - col + 1)*(currentRow - row + 1)) > maxSuitableArea)
+                {
+                    maxSuitableArea = tempArea;
+
+                    res->m_Y = row;
+                    res->m_X = col;
+                    res->m_W = currentCol - col + 1;
+                    res->m_H = currentRow - row + 1;
+
+                }
+
+                ++currentCol;
             }
-            maxAreas[j] += (stack1.empty() ? size : stack1.top()) - j - 1;
-            stack1.push(j);
+
         }
 
-        for (int j = 0; j < size; ++j) {
-            if ((tmpArea = cache[i][j] * (maxAreas[j] + 1)) > maxSuitableArea) {
-                maxSuitableArea = tmpArea;
-                res->m_X = j - left[j];
-                res->m_Y = i - cache[i][j];
-                res->m_W = maxAreas[j] + 1;
-                res->m_H = cache[i][j];
-            }
-        }
     }
 
     //freeing of cache allocated resources
-    for (int i = 0; i <= size; ++i) {
+    for (int i = 0; i < size; ++i) {
         delete[] cache[i];
     }
 
+    delete[] rowCache;
     delete[] cache;
-    delete[] maxAreas;
-    delete[] left;
 
     return maxSuitableArea != 0;
 }
@@ -259,10 +238,9 @@ void solveProblems() {
         }
 
         g_Buffer.pop();
-
         pthread_mutex_unlock(&g_MtxBuffer);
-
         delete top;
+        sem_post(&g_Free);
 
         TRect solution;
 
@@ -284,8 +262,6 @@ void solveProblems() {
                 crimeProblem->m_Done(crimeProblem, NULL);
             }
         }
-
-        sem_post(&g_Free);
     }
 }
 
